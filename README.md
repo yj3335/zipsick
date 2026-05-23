@@ -1,4 +1,4 @@
-# zipsick: Autonomous Public-Health Signal Agent
+# Zipsick: Autonomous Public-Health Signal Agent
 
 Catches ZIP-level illness outbreaks early by watching open-web signals before people reach the hospital.
 
