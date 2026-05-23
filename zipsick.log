@@ -1,0 +1,2 @@
+{"metric": "outbreak.events_ingested", "value": 16, "tags": ["run_id:run_demo"]}
+{"event": "ingestion_complete", "run_id": "run_demo", "signals": 16}
