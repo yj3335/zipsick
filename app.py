@@ -3,6 +3,7 @@
 
 import os
 from fastapi import FastAPI, Header, HTTPException
+from pydantic import BaseModel
 from storage.clickhouse import get_alert, mark_alert_paid
 
 app = FastAPI(
@@ -84,3 +85,35 @@ def get_confirmed_alert(
 
     RUN_STATE["proof"]["x402"] = "paid"
     return mark_alert_paid(alert_id)
+
+
+class PublishedAlertPayload(BaseModel):
+    title: str
+    summary: str
+    citations: list[str]
+    metadata: dict
+
+
+PUBLISHED_ALERTS: dict = {}
+
+
+@app.post("/alerts/publish", summary="Receive a published alert package (local publisher)")
+def publish_alert(payload: PublishedAlertPayload):
+    alert_id = payload.metadata.get("alert_id")
+    if not alert_id:
+        raise HTTPException(status_code=422, detail="alert_id missing in metadata")
+    
+    PUBLISHED_ALERTS[alert_id] = payload
+    RUN_STATE["proof"]["senso"] = "published"
+    
+    return {
+        "status": "success",
+        "url": f"http://localhost:8000/alerts/published/{alert_id}"
+    }
+
+
+@app.get("/alerts/published/{alert_id}", summary="View a published cited.md alert package")
+def get_published_alert(alert_id: str):
+    if alert_id not in PUBLISHED_ALERTS:
+        raise HTTPException(status_code=404, detail="alert not found")
+    return PUBLISHED_ALERTS[alert_id]

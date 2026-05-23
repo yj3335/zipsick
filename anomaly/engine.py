@@ -21,6 +21,7 @@ def run_once(demo: bool = False) -> list:
     sql = ANOMALY_SQL.replace("z_score >= 2.5", f"z_score >= {z_threshold}").replace(
         "recent.recent_count >= 5", f"recent.recent_count >= {min_count}"
     )
+    sql = sql.strip().rstrip(";")
 
     rows = client().query(sql).named_results()
     return [handle_anomaly(row) for row in rows]

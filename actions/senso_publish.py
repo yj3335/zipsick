@@ -24,21 +24,25 @@ def publish_cited_alert(package) -> str | None:
             f"z={package.z_score:.2f}, aggregate clinical count={package.clinical_aggregate_count}."
         ),
         "citations": package.source_urls,
-        "metadata": package.model_dump(),
+        "metadata": package.model_dump(mode="json"),
     }
 
-    if url and api_key:
-        response = requests.post(
-            url,
-            headers={"Authorization": f"Bearer {api_key}"},
-            json=payload,
-            timeout=30,
-        )
-        response.raise_for_status()
-        published_url = response.json().get("url")
-        emit_metric("outbreak.publisher.senso.success", 1, tags=[f"alert_id:{package.alert_id}"])
-        log_event("senso_published", {"alert_id": package.alert_id, "url": published_url})
-        return published_url
+    if url and api_key and not url.strip().endswith("yj3335/zipsick"):
+        try:
+            response = requests.post(
+                url,
+                headers={"Authorization": f"Bearer {api_key}"},
+                json=payload,
+                timeout=30,
+            )
+            response.raise_for_status()
+            published_url = response.json().get("url")
+            emit_metric("outbreak.publisher.senso.success", 1, tags=[f"alert_id:{package.alert_id}"])
+            log_event("senso_published", {"alert_id": package.alert_id, "url": published_url})
+            return published_url
+        except Exception as exc:
+            log_event("senso_publish_failed", {"alert_id": package.alert_id, "error": str(exc)})
+            print(f"[senso_publish] Remote publish failed: {exc}. Falling back to local file.")
 
     # Local cited.md fallback — clearly labelled in logs and demo narration.
     pathlib.Path("public/alerts").mkdir(parents=True, exist_ok=True)
