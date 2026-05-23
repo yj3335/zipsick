@@ -4,6 +4,8 @@ Catches ZIP-level illness outbreaks early by watching open-web signals before pe
 
 ---
 
+Project Link : https://youtu.be/mrqePlNvy8g
+
 ## The Problem
 
 Official systems like the CDC NSSP/BioSense platform track Emergency Department visits. That data is solid, but it's downstream. People get sick, then they search, post, and complain online. Then they go to the hospital.
