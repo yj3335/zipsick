@@ -22,5 +22,5 @@ NYC_311_FIELDS = [
 
 REDDIT_SUBREDDITS = ["nyc", "AskNYC", "newyorkcity"]
 HEALTH_KEYWORDS = "food poisoning OR stomach bug OR norovirus OR diarrhea OR sick OR covid OR flu OR rsv OR measles OR legionnaires OR bedbugs OR scabies OR rats OR roaches"
-YELP_SEARCH_URL = "https://www.yelp.com/search?find_desc=food+poisoning+OR+bedbugs+OR+sick+OR+roaches+OR+rats&find_loc=New+York%2C+NY"
+YELP_SEARCH_URL = "https://www.yelp.com/search?find_desc=food+poisoning+OR+bedbugs+OR+sick+OR+roaches+OR+rats&find_loc=10036"
 

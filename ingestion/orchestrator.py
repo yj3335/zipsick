@@ -32,7 +32,7 @@ def ingest_once(run_id: str | None = None) -> list:
                     nimble_text,
                     source_type="nimble_open_web",
                     source_url=url,
-                    fallback_zip="10014",
+                    fallback_zip="10036",
                     run_id=run_id,
                 )
             )
@@ -66,7 +66,7 @@ def ingest_once(run_id: str | None = None) -> list:
                         content,
                         source_type="reddit_scrape",
                         source_url=post["url"],
-                        fallback_zip="10014",  # Default fallback for NYC subreddits
+                        fallback_zip="10036",  # Default fallback for NYC subreddits
                         run_id=run_id,
                     )
                 )
@@ -82,7 +82,7 @@ def ingest_once(run_id: str | None = None) -> list:
                     yelp_html,
                     source_type="yelp_scrape",
                     source_url=YELP_SEARCH_URL,
-                    fallback_zip="10014",
+                    fallback_zip="10036",
                     run_id=run_id,
                 )
             )

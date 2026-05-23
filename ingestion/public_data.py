@@ -14,6 +14,7 @@ def fetch_nyc_311_records(limit: int = NYC_311_LIMIT) -> list[dict]:
         "$limit": limit,
         "$order": "created_date DESC",
         "$select": ",".join(NYC_311_FIELDS),
+        "incident_zip": "10036",
     }
     try:
         response = requests.get(NYC_311_ENDPOINT, params=params, timeout=30)
