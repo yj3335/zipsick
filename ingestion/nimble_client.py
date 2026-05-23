@@ -37,7 +37,7 @@ def fetch_public_page(url: str) -> str:
         response = requests.post(
             api_url,
             headers=headers,
-            json={"url": url, "parse": True, "country": "US", "locale": "en"},
+            json={"url": url, "render": True, "country": "US", "locale": "en"},
             timeout=60,
         )
         response.raise_for_status()

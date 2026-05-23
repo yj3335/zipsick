@@ -1,6 +1,7 @@
 # ingestion/orchestrator.py
 # Top-level ingestion run: Nimble open-web lane + NYC 311 public-data lane + Reddit + Yelp.
 
+from __future__ import annotations
 import os
 from ingestion.extractor import extract_signals
 from ingestion.nimble_client import fetch_public_page
@@ -22,6 +23,9 @@ def ingest_once(run_id: str | None = None) -> list:
     Returns the list of OutbreakSignal objects inserted.
     """
     signals = []
+    # Nimble/Reddit/Yelp signals are synthetic when running in mock mode
+    # so they don't pollute the real-signal count or source_urls.
+    nimble_mock = os.environ.get("NIMBLE_MODE", "mock") == "mock"
 
     # --- Sponsor/open-web proof lane ---
     for url in NIMBLE_TARGET_URLS:
@@ -34,12 +38,13 @@ def ingest_once(run_id: str | None = None) -> list:
                     source_url=url,
                     fallback_zip="10036",
                     run_id=run_id,
+                    synthetic=nimble_mock,
                 )
             )
         except Exception as exc:
             print(f"[orchestrator] Nimble open-web lane failed for {url}: {exc}")
 
-    # --- Reliable public-data lane ---
+    # --- Reliable public-data lane (always real — Socrata API, not Nimble) ---
     try:
         for record in fetch_nyc_311_records():
             text, zip_code = record_to_text(record)
@@ -50,6 +55,7 @@ def ingest_once(run_id: str | None = None) -> list:
                     source_url=None,
                     fallback_zip=zip_code,
                     run_id=run_id,
+                    synthetic=False,
                 )
             )
     except Exception as exc:
@@ -66,8 +72,9 @@ def ingest_once(run_id: str | None = None) -> list:
                         content,
                         source_type="reddit_scrape",
                         source_url=post["url"],
-                        fallback_zip="10036",  # Default fallback for NYC subreddits
+                        fallback_zip="10036",
                         run_id=run_id,
+                        synthetic=nimble_mock,
                     )
                 )
         except Exception as exc:
@@ -84,6 +91,7 @@ def ingest_once(run_id: str | None = None) -> list:
                     source_url=YELP_SEARCH_URL,
                     fallback_zip="10036",
                     run_id=run_id,
+                    synthetic=nimble_mock,
                 )
             )
     except Exception as exc:

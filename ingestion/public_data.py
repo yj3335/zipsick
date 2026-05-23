@@ -1,6 +1,7 @@
 # ingestion/public_data.py
 # NYC Open Data / 311 collector — reliable public-data ingestion lane.
 
+from __future__ import annotations
 import requests
 from config.sources import NYC_311_ENDPOINT, NYC_311_LIMIT, NYC_311_FIELDS, HEALTH_KEYWORDS
 

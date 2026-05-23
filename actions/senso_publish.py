@@ -2,7 +2,7 @@
 # Publish confirmed alerts via Senso/cited.md API.
 # Falls back to a local cited.md-compatible markdown file when credentials are absent.
 
-import os
+from __future__ import annotationsimport os
 import pathlib
 import requests
 from observability.datadog import emit_metric, log_event

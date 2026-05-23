@@ -1,5 +1,6 @@
 # ingestion/extractor.py
 
+from __future__ import annotations
 import hashlib
 import re
 from datetime import datetime, timezone
@@ -21,6 +22,7 @@ def extract_signals(
     source_url: str | None,
     fallback_zip: str | None = None,
     run_id: str | None = None,
+    synthetic: bool = False,
 ) -> list[OutbreakSignal]:
     """
     Parse free text for NYC ZIP codes and symptom keywords.
@@ -48,7 +50,7 @@ def extract_signals(
                     source_url=source_url,
                     evidence_text=evidence,
                     confidence=0.75,
-                    synthetic=False,
+                    synthetic=synthetic,
                 )
             )
     return signals

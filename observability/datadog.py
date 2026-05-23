@@ -3,6 +3,7 @@
 # Ships JSON logs to stdout; Datadog agent or log forwarder can tail them.
 # For a full Datadog integration, swap logger.info calls with the datadog-api-client SDK.
 
+from __future__ import annotations
 import json
 import logging
 

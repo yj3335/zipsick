@@ -3,6 +3,7 @@
 
 import copy
 import os
+from typing import Optional, List
 from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import RedirectResponse
@@ -82,7 +83,7 @@ def root():
 )
 def get_confirmed_alert(
     alert_id: str,
-    x_payment: str | None = Header(default=None),
+    x_payment: Optional[str] = Header(default=None),
 ):
     """
     Returns a confirmed alert package.
@@ -120,7 +121,7 @@ def get_confirmed_alert(
 class PublishedAlertPayload(BaseModel):
     title: str
     summary: str
-    citations: list[str]
+    citations: List[str]
     metadata: dict
 
 
