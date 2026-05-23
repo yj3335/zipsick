@@ -9,3 +9,6 @@ __pycache__/
 .env
 .env.*
 !.env.example
+DEMO_GUIDE.md
+demo/_reset_demo.py
+demo/_check_db.py
