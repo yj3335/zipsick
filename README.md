@@ -1,150 +1,96 @@
-# Neighborhood Outbreak Early Warning
+# zipsick
 
-An autonomous public-health signal agent that monitors verified public/open-web sources, detects ZIP-level symptom anomalies, verifies them through an aggregate-only clinical adapter, notifies operators, publishes citable context, and exposes confirmed alert packages behind payment rails.
+An autonomous public health signal agent that spots early community illness outbreaks before they hit official databases. 
 
-> **Safety line**: This is public-good outbreak awareness, not diagnosis, not individual surveillance, and not automated medical advice. Public-facing health language is drafted for authorized review only.
+## What is zipsick?
 
----
+zipsick is a tool that monitors public web pages, search results, and civic datasets to detect local symptom spikes. When the agent detects an unusual symptom cluster in a specific ZIP code, it runs a privacy-safe check against aggregate clinical counts. If both signals match, the agent alerts health teams, publishes a cited advisory page, and protects detailed outbreak packages behind a payment gate.
 
-## Architecture
+It doesn't give medical advice or track individuals. It simply flags early signs of community illness.
 
-```
-Sources (Nimble open-web + NYC 311 public data)
-  → Extractor / normalizer
-  → ClickHouse outbreak_signals
-  → Anomaly engine (z-score SQL)
-  → Clinical aggregate verifier
-  → Alert orchestrator
-  → Datadog logs/metrics + Slack alert
-  → Senso/cited.md publisher
-  → x402 paid alert endpoint
-  → /status control panel
-```
+## Why is it here?
 
-## Sponsor Tools
+Official health surveillance is excellent. But it takes time. Systems like the CDC NSSP and BioSense platform track emergency department visits. That only helps after patients show up at the hospital. 
 
-| Tool | Role |
-|---|---|
-| **Nimble** | Open-web page/search collection (sponsor ingestion lane) |
-| **ClickHouse** | Event storage, baseline aggregation, anomaly z-score SQL |
-| **Datadog** | Structured logs + metrics across the full pipeline |
-| **Senso / cited.md** | Citable publication of confirmed alert packages |
-| **x402 / CDP** | HTTP payment gate: `402 → payment header → 200 OK` |
+zipsick complements these systems by watching the open web first. When people feel sick, they often talk about it online. Or they file civic complaints before they go to a doctor. By capturing these open-web signals early, we give public health teams crucial extra lead time to react. 
 
-## Safety Guardrails
+We built this to prove that autonomous web collection, real-time math, and privacy-preserving clinical checks can work together. It works.
 
-- No individual patient data is stored or transmitted.
-- Clinical verification returns aggregate counts only (minimum threshold = 2).
-- All synthetic/controlled demo signals are flagged `synthetic=true` in the database.
-- CDC NSSP/BioSense is acknowledged as the authoritative near-real-time surveillance system; this project provides an earlier complementary signal from public/open-web sources.
-- No automated medical advice is generated or published.
+## How it works
 
-## CDC Language
+The agent runs a complete signal pipeline without requiring manual decisions:
 
-This project **complements** official public-health surveillance. The CDC NSSP/BioSense platform supports near-real-time ED surveillance for participating facilities. Our system adds an earlier community signal from public/open-web sources for epidemiologists and public-health teams — not a replacement for official reporting.
+1. **Ingest**: The agent checks open web pages using browser extraction. It also queries public civic complaint data (like NYC 311).
+2. **Extract**: It parses incoming text to extract specific symptoms (like stomach issues or fever) and ZIP codes.
+3. **Score**: It compares current symptom counts against a 90-day historical baseline in ClickHouse. If the counts exceed the standard deviation threshold, it triggers an anomaly.
+4. **Verify**: To prevent false alarms, it queries an aggregate clinical database. It requires at least two matching clinical cases in the same ZIP code to proceed.
+5. **Act**: The agent sends structured metrics, logs a trace, and posts an alert to the team's Slack channel.
+6. **Publish**: It publishes a citeable markdown summary (a cited.md page) with references linking back to the web sources.
+7. **Monetize**: It packages the full, verified outbreak alert and gates it behind a standard HTTP 402 payment protocol.
 
----
+## Safety and Boundaries
+
+We designed zipsick with strict public safety and privacy constraints:
+- **No PHI**: The agent never tracks individuals or collects patient-level medical records.
+- **Aggregate Verification**: Clinical checks only return total counts (like "2 presentations"). This keeps all individual data private.
+- **No Medical Advice**: It doesn't diagnose users or recommend treatments.
+- **Review Loop**: Public advisory text is drafted as a proposal for human health officials to review before release.
+
+## Sponsor Integrations
+
+We use five sponsor technologies to power the pipeline:
+- **Nimble**: Fetches public web content and search results dynamically.
+- **ClickHouse**: Stores signals, calculates standard deviations, and manages z-scores.
+- **Datadog**: Tracks health metrics and pipeline events.
+- **Senso**: Generates cited advisory pages with source links.
+- **x402 / CDP**: Gates completed alerts behind developer payment rails.
 
 ## Quick Start
 
+### 1. Set up your environment
+Create a virtual environment and install the dependencies:
 ```bash
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 cp .env.example .env
-# Fill in .env with your credentials
 ```
+*(Make sure to update the `.env` file with your credentials.)*
 
-### One-Time Setup
-
+### 2. Prepare the database
+Initialize the schema and seed 90 days of low-count historical baseline data:
 ```bash
 python -m storage.init_schema
-python demo/seed_baseline.py --zip 10014 --symptom gi --days 90 --avg-per-day 2
+python -m demo.seed_baseline --zip 10014 --symptom gi --days 90 --avg-per-day 2
 ```
 
-### Live Demo (4 terminals)
+### 3. Run the live demo
+Open four terminal windows to run the agent pipeline:
 
-```bash
-# Terminal 1 — API + control panel
-uvicorn app:app --reload --port 8000
+- **Terminal 1 (Web Server)**: Start the status dashboard and payment gate.
+  ```bash
+  uvicorn app:app --reload --port 8000
+  ```
+- **Terminal 2 (Ingest)**: Run a poll of public web data.
+  ```bash
+  python -m ingestion.orchestrator
+  ```
+- **Terminal 3 (Spike)**: Inject a demo symptom spike to trigger the threshold.
+  ```bash
+  python -m demo.inject_spike --zip 10014 --symptom gi --count 15
+  ```
+- **Terminal 4 (Score)**: Run the anomaly detector to analyze and process the alert.
+  ```bash
+  python -m anomaly.engine --demo
+  ```
 
-# Terminal 2 — Ingestion
-python -m ingestion.orchestrator
-
-# Terminal 3 — Controlled spike
-python demo/inject_spike.py --zip 10014 --symptom gi --count 15
-
-# Terminal 4 — Anomaly engine
-python -m anomaly.engine --demo
-```
-
-### Payment Demo
+### 4. Verify the payment gate
+You can check the gated endpoint with these commands:
 
 ```bash
 # Returns 402 Payment Required
-curl -i http://localhost:8000/alerts/confirmed/alert_abc123
+curl -i http://localhost:8000/alerts/confirmed/<YOUR_ALERT_ID>
 
-# Returns 200 OK with full alert package
-curl -i -H "x-payment: demo-paid" http://localhost:8000/alerts/confirmed/alert_abc123
+# Returns 200 OK after mock payment proof
+curl -i -H "x-payment: demo-paid" http://localhost:8000/alerts/confirmed/<YOUR_ALERT_ID>
 ```
-
----
-
-## Project Structure
-
-```
-.
-├── app.py                        # FastAPI control panel + x402 gate
-├── requirements.txt
-├── .env.example
-├── config/
-│   ├── sources.py                # Source URLs and metadata
-│   └── thresholds.py             # Anomaly thresholds (env-overridable)
-├── ingestion/
-│   ├── models.py                 # OutbreakSignal + AlertPackage Pydantic models
-│   ├── extractor.py              # Symptom/ZIP keyword extractor
-│   ├── nimble_client.py          # Nimble adapter (mock | http)
-│   ├── public_data.py            # NYC 311 Open Data collector
-│   └── orchestrator.py          # Ingestion run coordinator
-├── storage/
-│   ├── schema.sql                # ClickHouse DDL
-│   ├── anomaly.sql               # Z-score anomaly query
-│   ├── clickhouse.py             # CRUD client
-│   └── init_schema.py           # One-time schema init
-├── anomaly/
-│   └── engine.py                # Runs anomaly SQL → alert orchestrator
-├── verification/
-│   └── clinical_aggregate.py    # Aggregate-only clinical verifier
-├── actions/
-│   ├── orchestrator.py          # Alert lifecycle orchestrator
-│   ├── slack_alerts.py          # Slack notification
-│   └── senso_publish.py         # Senso/cited.md publisher
-├── observability/
-│   └── datadog.py               # Structured log + metric emitter
-├── demo/
-│   ├── inject_spike.py          # Controlled demo spike
-│   └── seed_baseline.py         # Historical baseline seeder
-└── tests/
-    ├── test_extractor.py
-    ├── test_anomaly.py
-    └── test_payment.py
-```
-
-## Running Tests
-
-```bash
-pip install pytest httpx
-pytest tests/ -v
-```
-
----
-
-## References
-
-- CDC NSSP/BioSense: https://www.cdc.gov/nssp/php/about/about-nssp-and-the-biosense-platform.html
-- NYC Open Data 311: https://data.cityofnewyork.us/resource/erm2-nwe9.json
-- ClickHouse: https://clickhouse.com/docs
-- Datadog: https://docs.datadoghq.com/
-- Nimble: https://docs.nimbleway.com/
-- Senso: https://docs.senso.ai/
-- x402: https://www.x402.org/
