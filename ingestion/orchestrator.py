@@ -96,5 +96,7 @@ def ingest_once(run_id: str | None = None) -> list:
 
 
 if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()
     ingest_once(os.environ.get("DEMO_RUN_ID", "run_demo"))
 

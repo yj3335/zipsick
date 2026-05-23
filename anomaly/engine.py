@@ -28,6 +28,8 @@ def run_once(demo: bool = False) -> list:
 
 
 if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()
     parser = argparse.ArgumentParser(description="Run anomaly detection once.")
     parser.add_argument("--demo", action="store_true", help="Use demo thresholds.")
     args = parser.parse_args()

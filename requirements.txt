@@ -7,3 +7,4 @@ python-dotenv
 slack-sdk
 datadog-api-client
 apscheduler
+httpx

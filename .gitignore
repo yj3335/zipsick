@@ -1,5 +1,11 @@
-/__pycache__
-/.claude
-/.venv
-/.cursor
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.claude/
+.venv/
+.cursor/
 .env
+.env.*
+!.env.example

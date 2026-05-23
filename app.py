@@ -2,12 +2,17 @@
 # FastAPI control panel, /status, and x402-gated confirmed-alert endpoint.
 
 import os
+from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
-from storage.clickhouse import get_alert, mark_alert_paid
+from storage.clickhouse import get_alert, get_control_panel_snapshot, mark_alert_paid
+from observability.datadog import emit_metric
+
+load_dotenv()
 
 app = FastAPI(
-    title="Neighborhood Outbreak Early Warning",
+    title="zipsick",
     description=(
         "Autonomous public-health signal agent. "
         "Monitors open-web sources for ZIP-level symptom anomalies, "
@@ -40,52 +45,34 @@ def health():
 
 @app.get("/status", summary="Agent run state and proof checklist")
 def status():
-    # Dynamically check database records to update the checklist status.
-    proof = RUN_STATE["proof"].copy()
+    state = dict(RUN_STATE)
     try:
-        from storage.clickhouse import client
-        ch = client()
-        
-        # Check clickhouse connectivity
-        ch_count = ch.query("SELECT count() FROM outbreak_signals").result_rows[0][0]
-        proof["clickhouse"] = "success" if ch_count > 0 else "pending"
-        
-        # Check nimble signals
-        nimble_count = ch.query("SELECT count() FROM outbreak_signals WHERE source_type = 'nimble_open_web'").result_rows[0][0]
-        proof["nimble"] = "success" if nimble_count > 0 else "pending"
-        
-        # Check clinical verification / alerts
-        alert_rows = ch.query("SELECT clinical_status, payment_status, senso_url FROM alerts").result_rows
-        if alert_rows:
-            proof["clinical"] = "success"
-            
-            # Check if any alert is paid or has returned 402
-            any_paid = any(r[1] == "paid" for r in alert_rows)
-            if any_paid:
-                proof["x402"] = "paid"
-            elif RUN_STATE["proof"]["x402"] != "pending":
-                proof["x402"] = RUN_STATE["proof"]["x402"]
-            
-            # Check if any alert has senso_url set
-            any_published = any(r[2] is not None for r in alert_rows)
-            if any_published or PUBLISHED_ALERTS:
-                proof["senso"] = "published"
-        
-        # Datadog key presence
+        snapshot = get_control_panel_snapshot()
+        state["database"] = snapshot
+        counts = snapshot["counts"]
+        latest_alerts = snapshot["latest_alerts"]
+        state["proof"]["clickhouse"] = "connected"
         if os.environ.get("DD_API_KEY"):
-            proof["datadog"] = "success"
-            
-    except Exception as e:
-        print(f"Error dynamically updating status: {e}")
-        pass
-
-    RUN_STATE["proof"].update(proof)
-    return RUN_STATE
+            state["proof"]["datadog"] = "logs_enabled"
+        if counts.get("nimble_real_signals", 0) > 0:
+            state["proof"]["nimble"] = "real_signal_present"
+        if latest_alerts:
+            latest = latest_alerts[0]
+            state["latest_decision"] = latest
+            state["stage"] = latest["clinical_status"]
+            state["proof"]["clinical"] = latest["clinical_status"]
+            if latest.get("senso_url"):
+                state["proof"]["senso"] = "published"
+            if latest.get("payment_status") == "paid":
+                state["proof"]["x402"] = "paid"
+    except Exception as exc:  # noqa: BLE001
+        state["database_error"] = str(exc)
+    return state
 
 
 @app.get("/", include_in_schema=False)
 def root():
-    return status()
+    return RedirectResponse(url="/status")
 
 
 @app.get(
@@ -112,6 +99,7 @@ def get_confirmed_alert(
     x402_enabled = os.environ.get("X402_ENABLED", "true").lower() == "true"
     if x402_enabled and not x_payment:
         RUN_STATE["proof"]["x402"] = "402_returned"
+        emit_metric("outbreak.payment.required", 1, tags=[f"alert_id:{alert_id}"])
         raise HTTPException(
             status_code=402,
             detail={
@@ -124,6 +112,7 @@ def get_confirmed_alert(
         )
 
     RUN_STATE["proof"]["x402"] = "paid"
+    emit_metric("outbreak.payment.completed", 1, tags=[f"alert_id:{alert_id}"])
     return mark_alert_paid(alert_id)
 
 

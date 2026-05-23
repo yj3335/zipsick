@@ -10,8 +10,9 @@ from storage.clickhouse import client
 def init():
     # Ensure database exists by connecting to 'default' first
     print("[init_schema] Verifying database existence...")
+    host = os.environ["CH_HOST"].replace("https://", "").replace("http://", "").rstrip("/")
     default_ch = clickhouse_connect.get_client(
-        host=os.environ["CH_HOST"],
+        host=host,
         port=int(os.environ.get("CH_PORT", "8443")),
         username=os.environ["CH_USER"],
         password=os.environ["CH_PASSWORD"],

@@ -36,11 +36,25 @@ FAKE_ALERT = {
 }
 
 
+FAKE_SNAPSHOT = {
+    "counts": {
+        "total_signals": 15,
+        "real_signals": 1,
+        "nimble_real_signals": 1,
+        "synthetic_signals": 14,
+        "latest_signal_at": "2024-01-01T00:00:00",
+    },
+    "latest_alerts": [FAKE_ALERT],
+}
+
+
 @pytest.fixture()
 def client():
     with (
         mock.patch("storage.clickhouse.get_alert", return_value=FAKE_ALERT),
         mock.patch("storage.clickhouse.mark_alert_paid", return_value={**FAKE_ALERT, "payment_status": "paid"}),
+        mock.patch("storage.clickhouse.get_control_panel_snapshot", return_value=FAKE_SNAPSHOT),
+        mock.patch("app.get_control_panel_snapshot", return_value=FAKE_SNAPSHOT),
     ):
         from app import app
         return TestClient(app)

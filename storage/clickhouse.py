@@ -10,8 +10,9 @@ load_dotenv()
 
 def client():
     """Return a connected ClickHouse client using environment credentials."""
+    host = os.environ["CH_HOST"].replace("https://", "").replace("http://", "").rstrip("/")
     return clickhouse_connect.get_client(
-        host=os.environ["CH_HOST"],
+        host=host,
         port=int(os.environ.get("CH_PORT", "8443")),
         username=os.environ["CH_USER"],
         password=os.environ["CH_PASSWORD"],
@@ -113,3 +114,45 @@ def mark_alert_paid(alert_id: str) -> dict | None:
         column_names=list(alert.keys()),
     )
     return alert
+
+
+def get_control_panel_snapshot() -> dict:
+    """
+    Return a lightweight DB-backed status snapshot for /status.
+    This makes the control panel useful even when ingestion, anomaly, and API
+    run as separate processes.
+    """
+    ch = client()
+    counts = list(ch.query(
+        """
+        SELECT
+            count() AS total_signals,
+            countIf(synthetic = false) AS real_signals,
+            countIf(synthetic = false AND source_type = 'nimble_open_web') AS nimble_real_signals,
+            countIf(synthetic = true) AS synthetic_signals,
+            max(timestamp) AS latest_signal_at
+        FROM outbreak_signals
+        """
+    ).named_results())[0]
+    latest_alerts = list(ch.query(
+        """
+        SELECT
+            alert_id,
+            run_id,
+            created_at,
+            zip,
+            symptom,
+            recent_count,
+            z_score,
+            clinical_status,
+            clinical_aggregate_count,
+            source_count,
+            source_diversity,
+            senso_url,
+            payment_status
+        FROM alerts
+        ORDER BY created_at DESC
+        LIMIT 5
+        """
+    ).named_results())
+    return {"counts": counts, "latest_alerts": latest_alerts}

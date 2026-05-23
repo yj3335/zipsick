@@ -45,4 +45,6 @@ def inspect_db():
         print(f"Error inspecting database: {e}")
 
 if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()
     inspect_db()

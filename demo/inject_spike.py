@@ -48,6 +48,8 @@ def inject(zip_code: str, symptom: str, count: int) -> None:
 
 
 if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()
     parser = argparse.ArgumentParser(description="Inject a controlled demo spike.")
     parser.add_argument("--zip", default="10014", help="Target ZIP code.")
     parser.add_argument("--symptom", default="gi", help="Symptom category.")

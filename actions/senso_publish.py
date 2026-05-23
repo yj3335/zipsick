@@ -27,11 +27,17 @@ def publish_cited_alert(package) -> str | None:
         "metadata": package.model_dump(mode="json"),
     }
 
-    if url and api_key and not url.strip().endswith("yj3335/zipsick"):
+    is_local_publish = bool(url) and (
+        url.startswith("http://localhost")
+        or url.startswith("http://127.0.0.1")
+        or url.startswith("http://0.0.0.0")
+    )
+    if url and (api_key or is_local_publish):
         try:
+            headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
             response = requests.post(
                 url,
-                headers={"Authorization": f"Bearer {api_key}"},
+                headers=headers,
                 json=payload,
                 timeout=30,
             )
