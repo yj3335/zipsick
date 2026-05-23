@@ -9,6 +9,12 @@ import logging
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("outbreak-agent")
 
+# Add file handler for Datadog Agent to tail
+file_handler = logging.FileHandler("zipsick.log")
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(logging.Formatter("%(message)s"))
+logger.addHandler(file_handler)
+
 
 def log_event(event_name: str, payload: dict) -> None:
     """Emit a structured JSON log line. Each log is indexed by Datadog as a log entry."""
