@@ -85,7 +85,7 @@ def insert_alert(package) -> None:
 
 def get_alert(alert_id: str) -> dict | None:
     """Fetch the most recent row for a given alert_id."""
-    rows = client().query(
+    rows = list(client().query(
         """
         SELECT *
         FROM alerts
@@ -94,7 +94,7 @@ def get_alert(alert_id: str) -> dict | None:
         LIMIT 1
         """,
         parameters={"alert_id": alert_id},
-    ).named_results()
+    ).named_results())
     return rows[0] if rows else None
 
 

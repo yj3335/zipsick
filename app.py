@@ -40,12 +40,52 @@ def health():
 
 @app.get("/status", summary="Agent run state and proof checklist")
 def status():
+    # Dynamically check database records to update the checklist status.
+    proof = RUN_STATE["proof"].copy()
+    try:
+        from storage.clickhouse import client
+        ch = client()
+        
+        # Check clickhouse connectivity
+        ch_count = ch.query("SELECT count() FROM outbreak_signals").result_rows[0][0]
+        proof["clickhouse"] = "success" if ch_count > 0 else "pending"
+        
+        # Check nimble signals
+        nimble_count = ch.query("SELECT count() FROM outbreak_signals WHERE source_type = 'nimble_open_web'").result_rows[0][0]
+        proof["nimble"] = "success" if nimble_count > 0 else "pending"
+        
+        # Check clinical verification / alerts
+        alert_rows = ch.query("SELECT clinical_status, payment_status, senso_url FROM alerts").result_rows
+        if alert_rows:
+            proof["clinical"] = "success"
+            
+            # Check if any alert is paid or has returned 402
+            any_paid = any(r[1] == "paid" for r in alert_rows)
+            if any_paid:
+                proof["x402"] = "paid"
+            elif RUN_STATE["proof"]["x402"] != "pending":
+                proof["x402"] = RUN_STATE["proof"]["x402"]
+            
+            # Check if any alert has senso_url set
+            any_published = any(r[2] is not None for r in alert_rows)
+            if any_published or PUBLISHED_ALERTS:
+                proof["senso"] = "published"
+        
+        # Datadog key presence
+        if os.environ.get("DD_API_KEY"):
+            proof["datadog"] = "success"
+            
+    except Exception as e:
+        print(f"Error dynamically updating status: {e}")
+        pass
+
+    RUN_STATE["proof"].update(proof)
     return RUN_STATE
 
 
 @app.get("/", include_in_schema=False)
 def root():
-    return RUN_STATE
+    return status()
 
 
 @app.get(
