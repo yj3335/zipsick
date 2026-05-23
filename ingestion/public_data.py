@@ -2,7 +2,7 @@
 # NYC Open Data / 311 collector — reliable public-data ingestion lane.
 
 import requests
-from config.sources import NYC_311_ENDPOINT, NYC_311_LIMIT, NYC_311_FIELDS
+from config.sources import NYC_311_ENDPOINT, NYC_311_LIMIT, NYC_311_FIELDS, HEALTH_KEYWORDS
 
 
 def fetch_nyc_311_records(limit: int = NYC_311_LIMIT) -> list[dict]:
@@ -18,7 +18,16 @@ def fetch_nyc_311_records(limit: int = NYC_311_LIMIT) -> list[dict]:
     try:
         response = requests.get(NYC_311_ENDPOINT, params=params, timeout=30)
         response.raise_for_status()
-        return response.json()
+        records = response.json()
+        
+        # Local keyword filtering
+        keywords = [k.strip().lower() for k in HEALTH_KEYWORDS.split(" OR ")]
+        filtered_records = []
+        for record in records:
+            text, _ = record_to_text(record)
+            if any(kw in text.lower() for kw in keywords):
+                filtered_records.append(record)
+        return filtered_records
     except Exception as exc:  # noqa: BLE001
         # Non-blocking: 311 is a backup lane; do not crash the orchestrator.
         print(f"[public_data] NYC 311 fetch failed (non-blocking): {exc}")
