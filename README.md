@@ -1,153 +1,241 @@
-# zipsick: Autonomous Public-Health Signal Agent
+# zipsick — Autonomous Public-Health Signal Agent
 
-An autonomous early-warning agent that spots community illness outbreaks by watching the open web, verifying spikes via aggregate clinical data, and exposing confirmed alert packages behind developer payment rails.
-
----
-
-## 💡 The Value Proposition: Complementing Official Surveillance
-
-Official public-health surveillance is highly reliable but has built-in delays. Systems like the CDC National Syndromic Surveillance Program (NSSP) and BioSense platform track Emergency Department (ED) visits. This only logs an event after a patient decides to go to the hospital.
-
-**zipsick** complements official systems by monitoring public open-web signals first. When people start getting sick:
-1. They search for symptoms or post on local community forums (Reddit, Yelp).
-2. They file civic complaints (like NYC 311 rodent or unsanitary condition reports).
-3. They check health advisory pages.
-
-By capturing and structuring these pre-hospital signals, zipsick gives public health teams early lead time to prepare.
+Early ZIP-level outbreak detection that complements official surveillance by watching public open-web signals before patients reach the hospital.
 
 ---
 
-## 🛠️ E2E Autonomous Pipeline Flow
+## The Problem
 
-The agent runs a complete, closed-loop pipeline without requiring human intervention:
+Official systems like the CDC NSSP/BioSense platform track Emergency Department visits — reliable, but downstream of when people actually get sick. **zipsick** captures the upstream signal: community posts, civic complaints, and public health pages — structured, anomaly-scored, and clinically verified — giving public-health teams earlier lead time to prepare.
+
+> **Language note**: This project complements official systems. It does not claim to replace CDC NSSP or BioSense, and does not say "CDC takes 2–6 weeks." We say: CDC surveillance is reliable; zipsick adds earlier open-web signal.
+
+---
+
+## Autonomous Pipeline
+
+The agent runs the full `observe → extract → store → score → verify → act → publish → monetize` loop without manual decisions. A single `run_id` traces every step in Datadog.
 
 ```
-[Ingest: Nimble & Socrata] 
-  ➜ [Extract: LLM Symptom/ZIP Parsing] 
-  ➜ [Store: ClickHouse DB] 
-  ➜ [Score: Historical Z-Score Math] 
-  ➜ [Verify: Live FHIR Aggregate Check] 
-  ➜ [Act: Slack Alerts & Datadog Metrics] 
-  ➜ [Publish: Senso/Cited.md Advisories] 
-  ➜ [Monetize: x402 Paid Alert Gate]
+[Nimble open-web + NYC 311 + Reddit]
+        │
+        ▼
+[Extractor: regex ZIP + symptom parser]
+        │
+        ▼
+[ClickHouse: outbreak_signals table]
+        │
+        ▼
+[Anomaly Engine: Z-score SQL]
+  (recent_count − baseline_avg) / baseline_stddev
+        │
+        ▼
+[Clinical Verifier: FHIR _summary=count, aggregate only, zero PHI]
+        │
+       / \
+ confirmed  suppressed
+      │           │
+      ▼           ▼
+[Slack + Datadog] [Datadog only]
+      │
+      ▼
+[Senso / cited.md publisher]
+      │
+      ▼
+[x402 Payment Gate → /alerts/confirmed/{id}]
+      │
+      ▼
+[/status: real-time proof checklist]
 ```
 
-1. **Ingest**: Queries Socrata for live Manhattan 311 complaints, polls local subreddits (Reddit API via Nimble), scrapes local Yelp reviews, and checks official health topic pages.
-2. **Extract**: Standardizes unstructured texts into structured records with location (ZIP code), symptom class, confidence, and timestamp.
-3. **Score**: Runs standard deviation calculations against a 90-day historical baseline in ClickHouse. If a ZIP/symptom count exceeds the threshold, it triggers an anomaly.
-4. **Verify**: Prevents false alarms by checking aggregate clinical counts (using SNOMED codes) via a live FHIR server (`hapi.fhir.org/baseR4`).
-5. **Act**: Logs pipeline metrics in Datadog and posts alert summaries to the team's Slack channel.
-6. **Publish**: Writes a cited advisory package containing original web references, publishing it to a local cited.md-compatible server.
-7. **Monetize**: Restricts access to the complete confirmed alert payload behind an HTTP 402 payment gate (x402 protocol).
+---
+
+## Sponsor Integrations
+
+| Tool | Role in Pipeline |
+|---|---|
+| **Nimble** | Open-web collection layer. Fetches public health pages and community sources with IP rotation. Supports Bearer auth, Basic auth, and `NIMBLE_MODE=mock` for offline demo. |
+| **ClickHouse** | Signal store and anomaly engine. Holds 90-day baseline; runs the Z-score SQL (`recent_count`, `baseline_avg`, `baseline_stddev`, `z_score`) in real time. |
+| **Datadog** | Structured logs and metrics across every stage. All events carry `run_id` and `alert_id` for full distributed trace. Events: `ingestion_complete`, `anomaly_detected`, `alert_confirmed`, `alert_suppressed`. Metrics: `outbreak.events_ingested`, `outbreak.alert.confirmed`, `outbreak.payment.completed`. |
+| **Senso / cited.md** | Publishes confirmed alerts as citable markdown documents with source links. Falls back to a local `public/alerts/{alert_id}.md` file when API credentials are absent; clearly labelled in logs either way. |
+| **x402 / Coinbase Developer Platform** | HTTP 402 payment gate on the confirmed-alert endpoint. Returns structured payment instructions without a header; unlocks full alert package with `x-payment` proof. |
 
 ---
 
-## 🔌 Sponsor Tech Integrations
+## Safety Guardrails
 
-We integrated five sponsor tools to power the pipeline:
-* **Nimble**: Serves as our web scraping infrastructure. It manages IP rotation and captures public health pages, Reddit posts, and Yelp reviews.
-* **ClickHouse**: Serves as our analytical storage. It stores over 1,000 baseline signals and executes the Z-score anomaly query.
-* **Datadog**: Tracks operational health, logs ingestion metrics, and monitors pipeline events.
-* **Senso**: Publishes cited outbreak advisories (cited.md format), automatically linking back to original web sources.
-* **x402 / Coinbase Developer Platform (CDP)**: Secures raw outbreak data behind developer payment rails, verifying transaction proofs via Base.
+- **No diagnosis.** No patient-level data is accessed, stored, or returned at any point.
+- **Aggregate-only clinical verification.** The FHIR adapter queries `Condition?_summary=count` — it receives an integer count, nothing else. No patient IDs, no names, no clinical notes.
+- **Public-good framing.** All public-facing health language is drafted for authorized review before distribution. The system flags anomalies; humans decide action.
+- **Synthetic signals are always labelled.** Demo spikes set `synthetic=true` and a distinct `source_type`. The evidence-ledger query lets judges see exactly which signals are real vs. controlled.
+- **CDC language.** The CDC NSSP/BioSense platform supports near-real-time ED surveillance for participating facilities. zipsick **complements** that system with earlier public/open-web signals.
 
 ---
 
-## 🏆 Judge's Verification Guide (The 6 Proof Artifacts)
+## Demo: Six Judge Proof Artifacts
 
-When grading the build, verify these active pipeline proofs:
+| # | Proof | What to Show |
+|---|---|---|
+| 1 | **Nimble / open-web** | One real public page becomes a structured signal. Logs show `source_type=nimble_open_web`. |
+| 2 | **Autonomy** | `GET /status` returns `run_id`, advancing `stage`, and a proof checklist that updates automatically. |
+| 3 | **Math** | ClickHouse returns `recent_count`, `baseline_avg`, `baseline_stddev`, `z_score` from the anomaly query. |
+| 4 | **Safety** | Clinical verifier calls FHIR `_summary=count` — aggregate integer only, no PHI. |
+| 5 | **Action** | Slack message and Datadog log appear automatically on confirmed alert. Senso URL or local cited.md file written. |
+| 6 | **Commerce** | `GET /alerts/confirmed/{id}` → `402 Payment Required` → add `x-payment: demo-paid` → `200 OK`, `payment_status: paid`. |
 
-### 1. Nimble/Open-Web Ingest Proof
-Run the ingestion orchestrator. It retrieves live web data and inserts structured signals:
+---
+
+## Quick Start
+
+### 1. Install
+
 ```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+### 2. Configure
+
+Copy `.env.example` to `.env` and fill in your keys:
+
+| Variable | Required | Description |
+|---|---|---|
+| `CH_HOST` | Yes | ClickHouse host (strip `https://`) |
+| `CH_PASSWORD` | Yes | ClickHouse password |
+| `NIMBLE_MODE` | Yes | `mock` (offline) or `http` (real API) |
+| `NIMBLE_API_KEY` | http mode | Nimble Bearer token |
+| `SLACK_BOT_TOKEN` | Optional | Slack bot token for alert posts |
+| `SLACK_CHANNEL_ID` | Optional | Target Slack channel |
+| `DD_API_KEY` | Optional | Datadog API key |
+| `SENSO_API_KEY` | Optional | Senso publisher key; falls back to local file |
+| `X402_ENABLED` | Optional | `true` (default) to enforce payment gate |
+| `FHIR_BASE_URL` | Optional | FHIR base URL; falls back to demo lookup |
+
+### 3. Initialize the database
+
+```powershell
+$env:PYTHONPATH="."
+.venv\Scripts\python -m storage.init_schema
+.venv\Scripts\python demo/seed_baseline.py --zip 10014 --symptom gi --days 90 --avg-per-day 2
+```
+
+### 4. Live demo (4 terminals)
+
+```powershell
+# Terminal 1 — API server
+$env:PYTHONPATH="."
+.venv\Scripts\python -m uvicorn app:app --reload --port 8000
+
+# Terminal 2 — Ingestion (Nimble + 311 + Reddit)
 $env:PYTHONPATH="."
 .venv\Scripts\python -m ingestion.orchestrator
-```
-Check the logs to verify that Nimble extracted real web content.
 
-### 2. Autonomy & Status Proof
-Visit the status page in your browser at `http://localhost:8000/status` or query it:
-```powershell
-Invoke-RestMethod -Uri http://localhost:8000/status
-```
-It returns the agent's active run ID and a verified checklist proving ClickHouse connection, Nimble signals, clinical status, Datadog configuration, Senso publishing, and x402 payment tracking.
+# Terminal 3 — Controlled spike (marks synthetic=true)
+$env:PYTHONPATH="."
+.venv\Scripts\python demo/inject_spike.py --zip 10014 --symptom gi --count 15
 
-### 3. ClickHouse Math Proof
-Query the database to inspect baseline signals and active alert entries:
+# Terminal 4 — Anomaly engine
+$env:PYTHONPATH="."
+.venv\Scripts\python -m anomaly.engine --demo
+```
+
+**Browser tabs to have open:**
+
+1. `http://localhost:8000/status` — proof checklist
+2. ClickHouse console → run `storage/anomaly.sql`
+3. Datadog → filter logs to `run_id:run_demo`
+4. Slack channel
+5. `public/alerts/` folder or Senso URL
+6. `http://localhost:8000/alerts/confirmed/{alert_id}` — 402 → pay → 200
+
+**Payment demo (curl):**
+
+```bash
+# Step 1 — shows 402
+curl -i http://localhost:8000/alerts/confirmed/<alert_id>
+
+# Step 2 — shows 200
+curl -i -H "x-payment: demo-paid" http://localhost:8000/alerts/confirmed/<alert_id>
+```
+
+---
+
+## Incident Simulator
+
+Simulate real NYC outbreaks (Legionella, Measles, Hantavirus, H3N2) end-to-end through the full pipeline:
+
 ```powershell
 $env:PYTHONPATH="."
-.venv\Scripts\python demo/query_db.py
+.venv\Scripts\python demo/test_recent_outbreaks.py --outbreak legionella
 ```
-This shows the Z-score calculation (`(recent_count - baseline_avg) / baseline_stddev`) working across the database tables.
 
-### 4. Safety & Clinical Verification Proof
-Review the clinical adapter in [clinical_aggregate.py](file:///c:/Users/yesjan/Documents/New%20project/zipsick/verification/clinical_aggregate.py). It queries the live FHIR server using aggregate-only parameters (`_summary=count`), ensuring zero Patient Health Information (PHI) is retrieved or stored.
+Available scenarios: `legionella` (ZIP 10031), `measles` (10036), `hantavirus` (10036), `influenza` (10036).
 
-### 5. Action & Publication Proof
-Verify that:
-* The local Senso publisher has created cited advisories.
-* Alerts have been pushed to the Slack workspace channel.
-* Datadog is logging execution metrics.
+The simulator seeds a 90-day baseline, injects incident signals with real evidence text, runs the anomaly engine, and prints the confirmed alert ID ready for the payment-gate demo.
 
-### 6. Commerce/Payment Gate Proof
-Query a confirmed alert endpoint. Without a payment header, it returns `402 Payment Required`:
+---
+
+## Demo Hygiene
+
+Repeated spike injections accumulate in the 6-hour window and inflate Z-scores. Before the final presentation, use a fresh `DEMO_RUN_ID`:
+
 ```powershell
-Invoke-RestMethod -Uri http://localhost:8000/alerts/confirmed/<alert_id>
+$env:DEMO_RUN_ID="run_final"
+.venv\Scripts\python demo/inject_spike.py --zip 10013 --symptom gi --count 15
 ```
-Supply the mock payment header to unlock the data:
+
+Or delete only recent synthetic rows:
+
+```sql
+ALTER TABLE outbreak.outbreak_signals
+DELETE
+WHERE synthetic = true
+  AND timestamp > now() - INTERVAL 6 HOUR
+  AND source_type IN ('nimble_demo', 'reddit_demo', 'nyc_311_demo');
+```
+
+---
+
+## Codebase Map
+
+| File | Role |
+|---|---|
+| [app.py](app.py) | FastAPI server — `/status` proof checklist, `/alerts/confirmed/{id}` x402 gate |
+| [ingestion/orchestrator.py](ingestion/orchestrator.py) | Ingestion coordinator: Nimble, NYC 311, Reddit, Yelp |
+| [ingestion/extractor.py](ingestion/extractor.py) | Regex-based ZIP + symptom parser |
+| [ingestion/nimble_client.py](ingestion/nimble_client.py) | Nimble open-web adapter (mock / http / SDK-ready) |
+| [ingestion/public_data.py](ingestion/public_data.py) | NYC 311 Socrata API client |
+| [storage/clickhouse.py](storage/clickhouse.py) | ClickHouse client and CRUD helpers |
+| [storage/schema.sql](storage/schema.sql) | DDL: `outbreak_signals` and `alerts` tables |
+| [storage/anomaly.sql](storage/anomaly.sql) | Z-score anomaly query (90-day baseline, 6-hour window) |
+| [anomaly/engine.py](anomaly/engine.py) | Anomaly runner with demo/prod threshold switching |
+| [verification/clinical_aggregate.py](verification/clinical_aggregate.py) | FHIR `_summary=count` verifier — aggregate only, no PHI |
+| [actions/orchestrator.py](actions/orchestrator.py) | Alert lifecycle: verify → publish → notify → store |
+| [actions/slack_alerts.py](actions/slack_alerts.py) | Slack confirmed-alert message sender |
+| [actions/senso_publish.py](actions/senso_publish.py) | Senso / cited.md publisher with local fallback |
+| [observability/datadog.py](observability/datadog.py) | Structured JSON logs and metrics |
+| [demo/inject_spike.py](demo/inject_spike.py) | Controlled demo spike (`synthetic=true`) |
+| [demo/seed_baseline.py](demo/seed_baseline.py) | 90-day historical baseline seeder |
+| [demo/test_recent_outbreaks.py](demo/test_recent_outbreaks.py) | Real-incident outbreak end-to-end simulator |
+
+---
+
+## Running Tests
+
 ```powershell
-Invoke-RestMethod -Headers @{"x-payment"="demo-paid"} -Uri http://localhost:8000/alerts/confirmed/<alert_id>
+$env:PYTHONPATH="."
+.venv\Scripts\python -m pytest tests/ -v
 ```
-The response returns `200 OK` and marks the status as `paid` in ClickHouse.
 
 ---
 
-## 🚀 Live Outbreak & Incident Simulator
+## References
 
-You can test how the pipeline handles real-world outbreaks using our simulation script, [test_recent_outbreaks.py](file:///c:/Users/yesjan/Documents/New%20project/zipsick/demo/test_recent_outbreaks.py). It models historical incidents like the **Harlem Legionnaires' outbreak** (ZIP `10031` at 3333 Broadway):
-
-1. **Initialize the database schema**:
-   ```powershell
-   .venv\Scripts\python -m storage.init_schema
-   ```
-
-2. **Run the outbreak test**:
-   ```powershell
-   $env:PYTHONPATH="."
-   .venv\Scripts\python demo/test_recent_outbreaks.py --outbreak legionella
-   ```
-   This seeds the historical baseline, injects realistic incident signals, triggers the Z-score threshold, verifies conditions on the live FHIR server, and publishes the confirmed alert.
-
-3. **Query the resulting alert package**:
-   Check the output of the simulation for the generated `<alert_id>` and fetch it:
-   ```powershell
-   # Unlocks the alert package
-   Invoke-RestMethod -Headers @{"x-payment"="demo-paid"} -Uri http://localhost:8000/alerts/confirmed/<alert_id>
-   ```
-
----
-
-## ⚡ Quick Start (Local Setup)
-
-1. **Install dependencies**:
-   ```powershell
-   python -m venv .venv
-   .venv\Scripts\Activate.ps1
-   pip install -r requirements.txt
-   ```
-2. **Configure environment**:
-   Copy `.env.example` to `.env` and fill in your keys for ClickHouse, Nimble, Datadog, Slack, and Senso.
-3. **Start the API Server**:
-   ```powershell
-   .venv\Scripts\python -m uvicorn app:app --port 8000
-   ```
-
----
-
-## 📂 Core Code Symbols
-
-* **API & Gating**: [app.py](file:///c:/Users/yesjan/Documents/New%20project/zipsick/app.py) handles the status control panel and x402 payment gate.
-* **Orchestration**: [orchestrator.py](file:///c:/Users/yesjan/Documents/New%20project/zipsick/ingestion/orchestrator.py) coordinates the ingestion lanes.
-* **Clinical Verification**: [clinical_aggregate.py](file:///c:/Users/yesjan/Documents/New%20project/zipsick/verification/clinical_aggregate.py) handles FHIR condition queries.
-* **Anomaly Detection**: [engine.py](file:///c:/Users/yesjan/Documents/New%20project/zipsick/anomaly/engine.py) reads the [anomaly.sql](file:///c:/Users/yesjan/Documents/New%20project/zipsick/storage/anomaly.sql) query to flag outbreaks.
-* **Simulation tool**: [test_recent_outbreaks.py](file:///c:/Users/yesjan/Documents/New%20project/zipsick/demo/test_recent_outbreaks.py) runs the incident simulator.
+- [CDC NSSP/BioSense Platform](https://www.cdc.gov/nssp/php/about/about-nssp-and-the-biosense-platform.html)
+- [NYC Open Data 311 API](https://data.cityofnewyork.us/resource/erm2-nwe9.json)
+- [ClickHouse Docs](https://clickhouse.com/docs)
+- [Datadog Docs](https://docs.datadoghq.com/)
+- [Nimble Docs](https://docs.nimbleway.com/)
+- [Senso Docs](https://docs.senso.ai/)
+- [x402 Protocol](https://www.x402.org/)

@@ -1,6 +1,7 @@
 # app.py
 # FastAPI control panel, /status, and x402-gated confirmed-alert endpoint.
 
+import copy
 import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException
@@ -45,7 +46,7 @@ def health():
 
 @app.get("/status", summary="Agent run state and proof checklist")
 def status():
-    state = dict(RUN_STATE)
+    state = copy.deepcopy(RUN_STATE)
     try:
         snapshot = get_control_panel_snapshot()
         state["database"] = snapshot

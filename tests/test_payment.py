@@ -91,3 +91,26 @@ def test_alert_404_for_unknown_id():
         tc = TestClient(app)
         r = tc.get("/alerts/confirmed/nonexistent")
         assert r.status_code == 404
+
+
+def test_alert_403_for_suppressed_status():
+    from app import app
+    suppressed = {**FAKE_ALERT, "clinical_status": "suppressed"}
+    with mock.patch("app.get_alert", return_value=suppressed):
+        tc = TestClient(app)
+        r = tc.get("/alerts/confirmed/alert_abc123")
+        assert r.status_code == 403
+
+
+def test_x402_disabled_bypasses_payment_gate():
+    from app import app
+    paid = {**FAKE_ALERT, "payment_status": "paid"}
+    with (
+        mock.patch("app.get_alert", return_value=FAKE_ALERT),
+        mock.patch("app.mark_alert_paid", return_value=paid),
+        mock.patch.dict(os.environ, {"X402_ENABLED": "false"}),
+    ):
+        tc = TestClient(app)
+        r = tc.get("/alerts/confirmed/alert_abc123")
+        assert r.status_code == 200
+        assert r.json()["payment_status"] == "paid"

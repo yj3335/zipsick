@@ -77,17 +77,17 @@ def verify_clinical_aggregate(
         except Exception as exc:
             print(f"[clinical_aggregate] FHIR query failed: {exc}. Falling back to demo database.")
 
-    # Demo lookup: fallback that keeps standard tests and baseline demo working.
+    # Demo lookup: only the explicitly listed ZIP/symptom pairs confirm.
+    # Everything else suppresses. This matches the guide's safety guarantee and
+    # covers the four outbreak-simulator scenarios.
     demo_counts: dict[tuple[str, str], int] = {
-        ("10014", "gi"): 2,
+        ("10014", "gi"): 2,          # West Village food-poisoning demo
+        ("10031", "respiratory"): 3,  # Harlem Legionella simulator
+        ("10036", "rash"): 3,         # Times Square measles simulator
+        ("10036", "general"): 3,      # Hantavirus transit-corridor simulator
+        ("10036", "respiratory"): 3,  # H3N2 influenza Times Square simulator
     }
-    is_manhattan = zip_code.startswith("100") or zip_code.startswith("101") or zip_code.startswith("102")
-    if (zip_code, symptom) in demo_counts:
-        count = demo_counts[(zip_code, symptom)]
-    elif is_manhattan and zip_code != "10012" and not (zip_code == "10014" and symptom != "gi"):
-        count = 2
-    else:
-        count = 0
+    count = demo_counts.get((zip_code, symptom), 0)
     status = "confirmed" if count >= min_required else "suppressed"
     reason = (
         "aggregate clinical match found"
