@@ -1,6 +1,7 @@
 # ingestion/orchestrator.py
 # Top-level ingestion run: Nimble open-web lane + NYC 311 public-data lane + Reddit + Yelp.
 
+from __future__ import annotations
 import os
 from ingestion.extractor import extract_signals
 from ingestion.nimble_client import fetch_public_page

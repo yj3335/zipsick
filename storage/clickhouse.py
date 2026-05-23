@@ -1,6 +1,7 @@
 # storage/clickhouse.py
 # ClickHouse client and CRUD helpers for outbreak_signals and alerts tables.
 
+from __future__ import annotations
 import os
 import clickhouse_connect
 from dotenv import load_dotenv

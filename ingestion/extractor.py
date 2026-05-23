@@ -1,5 +1,6 @@
 # ingestion/extractor.py
 
+from __future__ import annotations
 import hashlib
 import re
 from datetime import datetime, timezone
