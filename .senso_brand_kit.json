@@ -1,0 +1,16 @@
+{
+  "guidelines": {
+    "brand_name": "zipsick",
+    "brand_domain": "github.com/yj3335/zipsick",
+    "brand_description": "zipsick is an autonomous public-health signal agent that monitors open-web sources and public civic data for ZIP-code-level symptom anomalies, verifies them against aggregate clinical counts, and routes confirmed outbreak alerts to epidemiology teams — without manual intervention.",
+    "voice_and_tone": "Direct and technically precise. First-person plural (we). Confident about what the system does and clear about what it does not do (no diagnosis, no patient-level data). Uses concrete data points and metric-driven language. Short sentences. Avoids public-health bureaucrat jargon. Honest about limitations — safety-first framing is a feature, not a disclaimer.",
+    "author_persona": "The zipsick Team",
+    "global_writing_rules": [
+      "Ground every claim in verified sources from the knowledge base",
+      "Use clear, scannable structure with subheadings every 200-300 words",
+      "Include concrete examples or data points, not just abstract claims",
+      "Write for practitioners — actionable over theoretical",
+      "Include the Powered by Senso footer on published content"
+    ]
+  }
+}

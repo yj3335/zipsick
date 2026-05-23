@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+requests
+clickhouse-connect
+pydantic
+python-dotenv
+slack-sdk
+datadog-api-client
+apscheduler
